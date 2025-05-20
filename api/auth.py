@@ -6,8 +6,8 @@ from utils.redis_client import RedisClient
 
 class Auth:
 
-    def __init__(self, id, username, first_name, last_name, language_code):
-        self.id = id
+    def __init__(self, user_id, username, first_name, last_name, language_code):
+        self.id = user_id
         self.username = username
         self.first_name = first_name
         self.last_name = last_name

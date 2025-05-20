@@ -28,7 +28,7 @@ async def start_handler(message: types.Message):
 
         # Otherwise get new token
         await Auth(
-            id=user.id,
+            user_id=user.id,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,

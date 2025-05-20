@@ -1,29 +1,83 @@
 from aiogram import types, Router, F
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from api.task import Task
+from handlers.task.utils import get_formatted_tasks_response, get_cursor, get_hash
+from utils.redis_client import RedisClient
+from .enum import TasksListMessageType
 
 router = Router()
 
 @router.message(F.text == "/list_tasks")
-async def list_tasks_handler(message: types.Message):
+async def list_tasks_message_handler(message: types.Message):
+    await handle_tasks_list(message=message, call_type=TasksListMessageType.MESSAGE)
 
-    tasks = await Task(
-        user=message.from_user,
+@router.callback_query(F.data.startswith("tasks_nav_"))
+async def list_tasks_callback_handler(callback: types.CallbackQuery):
+    await handle_tasks_list(callback=callback, call_type=TasksListMessageType.CALLBACK_QUERY)
+
+async def handle_tasks_list(message: types.Message=None, callback: types.CallbackQuery=None, call_type: TasksListMessageType=None):
+
+    if not call_type:
+        raise TypeError("Unknown call type")
+
+    redis_client = RedisClient()
+
+    cursor = None
+    if call_type == TasksListMessageType.CALLBACK_QUERY:
+        cursor = await redis_client.get_user_callback_data(callback.from_user.id, get_hash(callback.data))
+
+    # Get the tasks from the API
+    tasks, next_page, previous_page = await Task(
+        user=message.from_user if message else callback.from_user,
         title=None,
         description=None,
         due_date=None
-    ).get_tasks()
+    ).get_tasks(cursor)
 
+    # Check if tasks are empty
     if not tasks:
-        await message.answer("📭 You have no tasks yet. Use /add_task to create one!")
+
+        if call_type == TasksListMessageType.MESSAGE:
+            await message.answer("📭 You have no tasks yet. Use /add_task to create one!")
+        else: # CALLBACK_QUERY
+            raise Exception("No tasks found for the next page.")
+
         return
 
-    response = "📝 *Your Tasks:*\n\n"
-    for i, task in enumerate(tasks, start=1):
-        response += (
-            f"*{i}. {task['title']}*\n"
-            f"📝 {task['description']}\n"
-            f"📅 Due: `{task['due_date']}`\n"
-            f"🆔 ID: `{task['id']}`\n\n"
-        )
+    # Format the tasks for display
+    response = get_formatted_tasks_response(tasks)
 
-    await message.answer(response, parse_mode="Markdown")
+    # Add inline pagination buttons
+    builder = InlineKeyboardBuilder()
+    button_count = 0 # Dynamic button count
+
+    # Proccess Inline buttons: 'previous' and 'next'
+    for i, page in enumerate([previous_page, next_page]):
+
+        if not page:
+            continue
+
+        button_count += 1
+        cursor = get_cursor(page)
+
+        if call_type == TasksListMessageType.CALLBACK_QUERY:
+            cb_hash = await redis_client.save_user_callback_data(callback.from_user.id, cursor)
+        else:
+            cb_hash = await redis_client.save_user_callback_data(message.from_user.id, cursor)
+
+
+        cb_data = f"tasks_nav_{cb_hash}"
+
+        if i == 0: # previous_page
+            builder.button(text="⬅️ Previous", callback_data=cb_data)
+        else: # next_page
+            builder.button(text="Next ➡️", callback_data=cb_data)
+
+    if button_count:
+        builder.adjust(button_count) # Adjust the buttons to fit in two columns
+
+    if call_type == TasksListMessageType.MESSAGE:
+        await message.answer(response, parse_mode="HTML", reply_markup=builder.as_markup())
+    else: # CALLBACK_QUERY
+        await callback.message.edit_text(response, parse_mode="HTML", reply_markup=builder.as_markup())

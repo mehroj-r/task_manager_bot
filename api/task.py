@@ -29,21 +29,30 @@ class Task:
 
         return response.json()
 
-    async def get_tasks(self):
+    async def get_tasks(self, cursor=None) -> tuple[dict, str, str]:
 
         # Authorize ApiClient
         await self.authorize(self.user)
 
-        response = await self.api_client.get(endpoint="tasks/")
+        # Define the endpoint
+        endpoint = "tasks/"
+
+        if cursor:
+            endpoint += f"?cursor={cursor}"
+
+        # Make the GET request
+        response = await self.api_client.get(endpoint=endpoint)
 
         if response.status_code != 200:
             raise Exception("Can't get tasks: ", response.text)
 
-        return response.json()
+        response_json = response.json()
+
+        return response_json["results"], response_json["next"], response_json["previous"]
 
     async def authorize(self, user):
         token = await Auth(
-            id=user.id,
+            user_id=user.id,
             username=user.username,
             first_name=user.first_name,
             last_name=user.last_name,
