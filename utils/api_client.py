@@ -1,12 +1,18 @@
 import requests
 from typing import Optional, Dict, Any, Union
 
+from aiogram.types import User
+
+from api.auth import Auth
+
 
 class ApiClient:
-    def __init__(self, base_url: str, default_headers: Optional[Dict[str, str]] = None, timeout: int = 10):
+
+    def __init__(self, base_url: str, user: User, default_headers: Optional[Dict[str, str]] = None, timeout: int = 10):
         self.base_url = base_url.rstrip('/')
         self.default_headers = default_headers or {}
         self.timeout = timeout
+        self.user = user
 
     async def request(
         self,
@@ -18,8 +24,13 @@ class ApiClient:
         headers: Optional[Dict[str, str]] = None,
         **kwargs
     ) -> requests.Response:
+
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         all_headers = {**self.default_headers, **(headers or {})}
+
+        # Add authorization header
+        token = await Auth(self.user).get_token()
+        all_headers["Authorization"] = f"Bearer {token}"
 
         response = requests.request(
             method=method.upper(),
@@ -31,6 +42,7 @@ class ApiClient:
             timeout=self.timeout,
             **kwargs
         )
+
         return response
 
     async def get(self, endpoint: str, **kwargs) -> requests.Response:
@@ -47,4 +59,3 @@ class ApiClient:
 
     async def delete(self, endpoint: str, **kwargs) -> requests.Response:
         return await self.request("DELETE", endpoint, **kwargs)
-
