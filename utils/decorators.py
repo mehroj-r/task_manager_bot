@@ -19,6 +19,12 @@ def membership_required(handler):
                             text="Join Channel",
                             url=f"https://t.me/{CHANNEL_ID.strip('@')}"
                         )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="Check Membership",
+                            callback_data="check_membership"
+                        )
                     ]
                 ]
             )
