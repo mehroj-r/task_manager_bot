@@ -3,21 +3,25 @@ from aiogram.fsm.context import FSMContext
 
 from api.task import Task
 from handlers.task.task_fsm import TaskCreation
+from utils.decorators import membership_required
 
 router = Router()
 
 @router.message(F.text == "/add_task")
+@membership_required
 async def start_task_creation(message: types.Message, state: FSMContext):
     await message.answer("Please enter the task title:")
     await state.set_state(TaskCreation.waiting_for_task_title)
 
 @router.message(TaskCreation.waiting_for_task_title)
+@membership_required
 async def get_title(message: types.Message, state: FSMContext):
     await state.update_data(title=message.text)
     await message.answer("Now enter the task description:")
     await state.set_state(TaskCreation.waiting_for_task_description)
 
 @router.message(TaskCreation.waiting_for_task_description)
+@membership_required
 async def get_description(message: types.Message, state: FSMContext):
     await state.update_data(description=message.text)
     await message.answer("Enter the due date (YYYY-MM-DD):")
@@ -26,6 +30,7 @@ async def get_description(message: types.Message, state: FSMContext):
 from datetime import datetime
 
 @router.message(TaskCreation.waiting_for_task_due_date)
+@membership_required
 async def get_due_date(message: types.Message, state: FSMContext):
     due_date_str = message.text
     try:

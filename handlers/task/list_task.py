@@ -3,6 +3,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from api.task import Task
 from handlers.task.utils import get_formatted_tasks_response, get_cursor, get_hash
+from utils.decorators import membership_required
 from utils.redis_client import RedisClient
 from .enum import TasksListMessageType
 
@@ -16,6 +17,7 @@ async def list_tasks_message_handler(message: types.Message):
 async def list_tasks_callback_handler(callback: types.CallbackQuery):
     await handle_tasks_list(callback=callback, call_type=TasksListMessageType.CALLBACK_QUERY)
 
+@membership_required
 async def handle_tasks_list(message: types.Message=None, callback: types.CallbackQuery=None, call_type: TasksListMessageType=None):
 
     if not call_type:

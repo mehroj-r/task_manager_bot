@@ -1,9 +1,13 @@
 from aiogram import types, Router
 from aiogram.filters import CommandStart
 
+from utils.decorators import membership_required
+
 router = Router()
 
+
 @router.message(CommandStart())
+@membership_required
 async def start_handler(message: types.Message):
 
     user = message.from_user
