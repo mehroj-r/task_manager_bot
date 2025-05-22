@@ -10,28 +10,30 @@ from .enum import TasksListMessageType
 router = Router()
 
 @router.message(F.text == "/list_tasks")
+@membership_required
 async def list_tasks_message_handler(message: types.Message):
     await handle_tasks_list(message=message, call_type=TasksListMessageType.MESSAGE)
 
 @router.callback_query(F.data.startswith("tasks_nav_"))
+@membership_required
 async def list_tasks_callback_handler(callback: types.CallbackQuery):
     await handle_tasks_list(callback=callback, call_type=TasksListMessageType.CALLBACK_QUERY)
 
-@membership_required
 async def handle_tasks_list(message: types.Message=None, callback: types.CallbackQuery=None, call_type: TasksListMessageType=None):
 
     if not call_type:
         raise TypeError("Unknown call type")
 
     redis_client = RedisClient()
+    user = message.from_user if message else callback.from_user
 
     cursor = None
     if call_type == TasksListMessageType.CALLBACK_QUERY:
-        cursor = await redis_client.get_user_callback_data(callback.from_user.id, get_hash(callback.data))
+        cursor = await redis_client.get_user_callback_data(user.id, get_hash(callback.data))
 
     # Get the tasks from the API
     tasks, next_page, previous_page = await Task(
-        user=message.from_user if message else callback.from_user,
+        user=user,
         title=None,
         description=None,
         due_date=None
@@ -63,12 +65,7 @@ async def handle_tasks_list(message: types.Message=None, callback: types.Callbac
         button_count += 1
         cursor = get_cursor(page)
 
-        if call_type == TasksListMessageType.CALLBACK_QUERY:
-            cb_hash = await redis_client.save_user_callback_data(callback.from_user.id, cursor)
-        else:
-            cb_hash = await redis_client.save_user_callback_data(message.from_user.id, cursor)
-
-
+        cb_hash = await redis_client.save_user_callback_data(user.id, cursor)
         cb_data = f"tasks_nav_{cb_hash}"
 
         if i == 0: # previous_page
